@@ -1,5 +1,5 @@
 {
-  "name": "roblox-lua-promise",
+  "name": "@jsdotlua/promise",
   "version": "3.5.0",
   "repository": {
     "type": "git",

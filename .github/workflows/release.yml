@@ -30,12 +30,23 @@ jobs:
           cache: "yarn"
           cache-dependency-path: "yarn.lock"
 
-      - name: Install packages
-        run: yarn install --frozen-lockfile
+      - name: Update yarn
+        run: yarn set version stable
 
-      - run: yarn publish
+      - name: Install packages
+        run: yarn install --immutable
+
+      - name: Run npmluau
+        run: yarn run prepare
+
+      - name: Authenticate yarn
+        run: |
+          yarn config set npmAlwaysAuth true
+          yarn config set npmScopes.jsdotlua.npmAuthToken $NPM_AUTH_TOKEN
         env:
           NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - run: yarn npm publish --access public
 
   publish-wally-package:
     needs: publish-package
@@ -56,8 +67,14 @@ jobs:
           cache: "yarn"
           cache-dependency-path: "yarn.lock"
 
+      - name: Update yarn
+        run: yarn set version stable
+
       - name: Install packages
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
+
+      - name: Run npmluau
+        run: yarn run prepare
 
       - name: Build assets
         run: yarn run build-assets
@@ -129,8 +146,14 @@ jobs:
           cache: "yarn"
           cache-dependency-path: "yarn.lock"
 
+      - name: Update yarn
+        run: yarn set version stable
+
       - name: Install packages
-        run: yarn install --frozen-lockfile
+        run: yarn install --immutable
+
+      - name: Run npmluau
+        run: yarn run prepare
 
       - name: Build assets
         run: yarn run build-assets
