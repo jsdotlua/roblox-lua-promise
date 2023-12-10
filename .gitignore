@@ -1,6 +1,7 @@
 /luacov.*.out
 node_modules/
 .vscode
+.yarn
 
 build
 roblox
