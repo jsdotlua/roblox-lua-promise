@@ -1,3 +1,7 @@
 /luacov.*.out
 node_modules/
 .vscode
+
+build
+roblox
+**/sourcemap.json
