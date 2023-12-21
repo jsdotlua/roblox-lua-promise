@@ -1,5 +1,5 @@
 [package]
-name = "jsdotlua/roblox-lua-promise"
+name = "jsdotlua/promise"
 version = "#VERSION#"
 registry = "https://github.com/UpliftGames/wally-index"
 realm = "shared"
