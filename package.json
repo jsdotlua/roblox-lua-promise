@@ -1,6 +1,6 @@
 {
   "name": "@jsdotlua/promise",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/jsdotlua/roblox-lua-promise.git"
@@ -11,7 +11,6 @@
     "prepare": "npmluau",
     "build-assets": "sh ./scripts/build-assets.sh"
   },
-  "dependencies": {},
   "devDependencies": {
     "npmluau": "^0.1.1"
   }
