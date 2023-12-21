@@ -2,21 +2,21 @@
 # Manual changes might be lost - proceed with caution!
 
 __metadata:
-  version: 6
-  cacheKey: 8
+  version: 8
+  cacheKey: 10
 
 "@jsdotlua/promise@workspace:.":
   version: 0.0.0-use.local
   resolution: "@jsdotlua/promise@workspace:."
   dependencies:
-    npmluau: ^0.1.1
+    npmluau: "npm:^0.1.1"
   languageName: unknown
   linkType: soft
 
 "commander@npm:^11.0.0":
   version: 11.1.0
   resolution: "commander@npm:11.1.0"
-  checksum: fd1a8557c6b5b622c89ecdfde703242ab7db3b628ea5d1755784c79b8e7cb0d74d65b4a262289b533359cd58e1bfc0bf50245dfbcd2954682a6f367c828b79ef
+  checksum: 66bd2d8a0547f6cb1d34022efb25f348e433b0e04ad76a65279b1b09da108f59a4d3001ca539c60a7a46ea38bcf399fc17d91adad76a8cf43845d8dcbaf5cda1
   languageName: node
   linkType: hard
 
@@ -24,17 +24,17 @@ __metadata:
   version: 0.1.1
   resolution: "npmluau@npm:0.1.1"
   dependencies:
-    commander: ^11.0.0
-    walkdir: ^0.4.1
+    commander: "npm:^11.0.0"
+    walkdir: "npm:^0.4.1"
   bin:
     npmluau: main.js
-  checksum: b0d2acd5ce126257119b9af306cdfc2b40ea5a4de0cec9b033d623425fba6976dabb75d138bc73abadef61ab4de2d271d1cfeddef961d1b573e2a9d7cdaf9b8e
+  checksum: 7d8a06998a72e7f002ded33b4c52a5a54431be7ecb8468ddcd28aaeba6d78eeca28fe9db175962e7a30cd12b2405f15a8d2a58f7e7bd5fdba67b5e4f800536b5
   languageName: node
   linkType: hard
 
 "walkdir@npm:^0.4.1":
   version: 0.4.1
   resolution: "walkdir@npm:0.4.1"
-  checksum: 71045c21dc19aae3321f897b6e9e507cf8039202665c35a0b908eecccaf25636aab769b31cbd61ef8267237fe22fc316923a691ecc2d9d38840a15c59c0f2594
+  checksum: 54cbe7afc5fb811a55748b0bfa077a9a4aa43f568eb5857db9785af9728e1ad8b1ecf6b9ce6f14b405c6124939a92522e36aaa0397f3f52a9a7a08496f2eebe1
   languageName: node
   linkType: hard
