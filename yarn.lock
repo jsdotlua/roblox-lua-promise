@@ -24,8 +24,8 @@ __metadata:
   version: 0.1.1
   resolution: "npmluau@npm:0.1.1"
   dependencies:
-    commander: "npm:^11.0.0"
-    walkdir: "npm:^0.4.1"
+    commander: ^11.0.0
+    walkdir: ^0.4.1
   bin:
     npmluau: main.js
   checksum: b0d2acd5ce126257119b9af306cdfc2b40ea5a4de0cec9b033d623425fba6976dabb75d138bc73abadef61ab4de2d271d1cfeddef961d1b573e2a9d7cdaf9b8e
