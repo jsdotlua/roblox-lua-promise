@@ -376,9 +376,7 @@ function Promise.defer(executor)
 	local traceback = debug.traceback(nil, 2)
 	local promise
 	promise = Promise._new(traceback, function(resolve, reject, onCancel)
-		local connection
-		connection = Promise._timeEvent:Connect(function()
-			connection:Disconnect()
+		task.defer(function()
 			local ok, _, result = runExecutor(traceback, executor, resolve, reject, onCancel)
 
 			if not ok then
@@ -1034,10 +1032,10 @@ end
 --[=[
 	Returns a Promise that resolves after `seconds` seconds have passed. The Promise resolves with the actual amount of time that was waited.
 
-	This function is **not** a wrapper around `wait`. `Promise.delay` uses a custom scheduler which provides more accurate timing. As an optimization, cancelling this Promise instantly removes the task from the scheduler.
+	This function is a wrapper around `task.delay`.
 
 	:::warning
-	Passing `NaN`, infinity, or a number less than 1/60 is equivalent to passing 1/60.
+	Passing NaN, +Infinity, -Infinity, 0, or any other number less than the duration of a Heartbeat will cause the promise to resolve on the very next Heartbeat.
 	:::
 
 	```lua
@@ -1049,100 +1047,18 @@ end
 	@param seconds number
 	@return Promise<number>
 ]=]
-do
-	-- uses a sorted doubly linked list (queue) to achieve O(1) remove operations and O(n) for insert
-
-	-- the initial node in the linked list
-	local first
-	local connection
-
-	function Promise.delay(seconds)
-		assert(type(seconds) == "number", "Bad argument #1 to Promise.delay, must be a number.")
-		-- If seconds is -INF, INF, NaN, or less than 1 / 60, assume seconds is 1 / 60.
-		-- This mirrors the behavior of wait()
-		if not (seconds >= 1 / 60) or seconds == math.huge then
-			seconds = 1 / 60
-		end
-
-		return Promise._new(debug.traceback(nil, 2), function(resolve, _, onCancel)
-			local startTime = Promise._getTime()
-			local endTime = startTime + seconds
-
-			local node = {
-				resolve = resolve,
-				startTime = startTime,
-				endTime = endTime,
-			}
-
-			if connection == nil then -- first is nil when connection is nil
-				first = node
-				connection = Promise._timeEvent:Connect(function()
-					local threadStart = Promise._getTime()
-
-					while first ~= nil and first.endTime < threadStart do
-						local current = first
-						first = current.next
-
-						if first == nil then
-							connection:Disconnect()
-							connection = nil
-						else
-							first.previous = nil
-						end
-
-						current.resolve(Promise._getTime() - current.startTime)
-					end
-				end)
-			else -- first is non-nil
-				if first.endTime < endTime then -- if `node` should be placed after `first`
-					-- we will insert `node` between `current` and `next`
-					-- (i.e. after `current` if `next` is nil)
-					local current = first
-					local next = current.next
-
-					while next ~= nil and next.endTime < endTime do
-						current = next
-						next = current.next
-					end
-
-					-- `current` must be non-nil, but `next` could be `nil` (i.e. last item in list)
-					current.next = node
-					node.previous = current
-
-					if next ~= nil then
-						node.next = next
-						next.previous = node
-					end
-				else
-					-- set `node` to `first`
-					node.next = first
-					first.previous = node
-					first = node
-				end
-			end
-
-			onCancel(function()
-				-- remove node from queue
-				local next = node.next
-
-				if first == node then
-					if next == nil then -- if `node` is the first and last
-						connection:Disconnect()
-						connection = nil
-					else -- if `node` is `first` and not the last
-						next.previous = nil
-					end
-					first = next
-				else
-					local previous = node.previous
-					-- since `node` is not `first`, then we know `previous` is non-nil
-					previous.next = next
-
-					if next ~= nil then
-						next.previous = previous
-					end
-				end
+function Promise.delay(seconds)
+	assert(type(seconds) == "number", "Bad argument #1 to Promise.delay, must be a number.")
+	local startTime = Promise._getTime()
+	return Promise._new(debug.traceback(nil, 2), function(resolve)
+		task.delay(seconds, function()
+			resolve(Promise._getTime() - startTime)
+		end)
 			end)
+			end)
+		end)
+	end
+	end)
 		end)
 	end
 end
@@ -1221,8 +1137,16 @@ end
 function Promise.prototype:_andThen(traceback, successHandler, failureHandler)
 	self._unhandledRejection = false
 
+	-- If we are already cancelled, we return a cancelled Promise
+	if self._status == Promise.Status.Cancelled then
+		local promise = Promise.new(function() end)
+		promise:cancel()
+
+		return promise
+	end
+
 	-- Create a new promise to follow this part of the chain
-	return Promise._new(traceback, function(resolve, reject)
+	return Promise._new(traceback, function(resolve, reject, onCancel)
 		-- Our default callbacks just pass values onto the next promise.
 		-- This lets success and failure cascade correctly!
 
@@ -1240,20 +1164,21 @@ function Promise.prototype:_andThen(traceback, successHandler, failureHandler)
 			-- If we haven't resolved yet, put ourselves into the queue
 			table.insert(self._queuedResolve, successCallback)
 			table.insert(self._queuedReject, failureCallback)
+
+			onCancel(function()
+				-- These are guaranteed to exist because the cancellation handler is guaranteed to only
+				-- be called at most once
+				if self._status == Promise.Status.Started then
+					table.remove(self._queuedResolve, table.find(self._queuedResolve, successCallback))
+					table.remove(self._queuedReject, table.find(self._queuedReject, failureCallback))
+				end
+			end)
 		elseif self._status == Promise.Status.Resolved then
 			-- This promise has already resolved! Trigger success immediately.
 			successCallback(unpack(self._values, 1, self._valuesLength))
 		elseif self._status == Promise.Status.Rejected then
 			-- This promise died a terrible death! Trigger failure immediately.
 			failureCallback(unpack(self._values, 1, self._valuesLength))
-		elseif self._status == Promise.Status.Cancelled then
-			-- We don't want to call the success handler or the failure handler,
-			-- we just reject this promise outright.
-			reject(Error.new({
-				error = "Promise is cancelled",
-				kind = Error.Kind.AlreadyCancelled,
-				context = "Promise created at\n\n" .. traceback,
-			}))
 		end
 	end, self)
 end
@@ -1497,26 +1422,47 @@ end
 	Used to set a handler for when the promise resolves, rejects, or is
 	cancelled.
 ]]
-function Promise.prototype:_finally(traceback, finallyHandler, onlyOk)
-	if not onlyOk then
-		self._unhandledRejection = false
-	end
+function Promise.prototype:_finally(traceback, finallyHandler)
+	self._unhandledRejection = false
 
-	-- Return a promise chained off of this promise
-	return Promise._new(traceback, function(resolve, reject)
+	local promise = Promise._new(traceback, function(resolve, reject, onCancel)
+		local handlerPromise
+
+		onCancel(function()
+			-- The finally Promise is not a proper consumer of self. We don't care about the resolved value.
+			-- All we care about is running at the end. Therefore, if self has no other consumers, it's safe to
+			-- cancel. We don't need to hold out cancelling just because there's a finally handler.
+			self:_consumerCancelled(self)
+
+			if handlerPromise then
+				handlerPromise:cancel()
+			end
+		end)
+
 		local finallyCallback = resolve
 		if finallyHandler then
-			finallyCallback = createAdvancer(traceback, finallyHandler, resolve, reject)
-		end
-
-		if onlyOk then
-			local callback = finallyCallback
 			finallyCallback = function(...)
-				if self._status == Promise.Status.Rejected then
-					return resolve(self)
+				local ok, _, resultList = runExecutor(traceback, finallyHandler, ...)
+				local result = resultList[1]
+				if not ok then
+					return reject(result)
 				end
 
-				return callback(...)
+				if Promise.is(result) then
+					handlerPromise = result
+
+					result
+						:finally(function(status)
+							if status ~= Promise.Status.Rejected then
+								resolve(self)
+							end
+						end)
+						:catch(function(...)
+							reject(...)
+						end)
+				else
+					resolve(self)
+				end
 			end
 		end
 
@@ -1527,7 +1473,9 @@ function Promise.prototype:_finally(traceback, finallyHandler, onlyOk)
 			-- The promise already settled or was cancelled, run the callback now.
 			finallyCallback(self._status)
 		end
-	end, self)
+	end)
+
+	return promise
 end
 
 --[=[
@@ -1626,38 +1574,6 @@ function Promise.prototype:finallyReturn(...)
 	end)
 end
 
---[[
-	Similar to finally, except rejections are propagated through it.
-]]
-function Promise.prototype:done(finallyHandler)
-	assert(
-		finallyHandler == nil or isCallable(finallyHandler),
-		string.format(ERROR_NON_FUNCTION, "Promise:done")
-	)
-	return self:_finally(debug.traceback(nil, 2), finallyHandler, true)
-end
-
---[[
-	Calls a callback on `done` with specific arguments.
-]]
-function Promise.prototype:doneCall(callback, ...)
-	assert(isCallable(callback), string.format(ERROR_NON_FUNCTION, "Promise:doneCall"))
-	local length, values = pack(...)
-	return self:_finally(debug.traceback(nil, 2), function()
-		return callback(unpack(values, 1, length))
-	end, true)
-end
-
---[[
-	Shorthand for a done handler that returns the given value.
-]]
-function Promise.prototype:doneReturn(...)
-	local length, values = pack(...)
-	return self:_finally(debug.traceback(nil, 2), function()
-		return unpack(values, 1, length)
-	end, true)
-end
-
 --[=[
 	Yields the current thread until the given Promise completes. Returns the Promise's status, followed by the values that the promise resolved or rejected with.
 
@@ -1671,9 +1587,15 @@ function Promise.prototype:awaitStatus()
 	if self._status == Promise.Status.Started then
 		local thread = coroutine.running()
 
-		self:finally(function()
-			task.spawn(thread)
-		end)
+		self
+			:finally(function()
+				task.spawn(thread)
+			end)
+			-- The finally promise can propagate rejections, so we attach a catch handler to prevent the unhandled
+			-- rejection warning from appearing
+			:catch(
+				function() end
+			)
 
 		coroutine.yield()
 	end
