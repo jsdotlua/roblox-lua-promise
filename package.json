@@ -9,10 +9,11 @@
   "main": "lib/init.lua",
   "scripts": {
     "prepare": "npmluau",
-    "build-assets": "sh ./scripts/build-assets.sh"
+    "build-assets": "sh ./scripts/build-assets.sh",
+    "clean": "rm -rf roblox build node_modules"
   },
   "devDependencies": {
-    "npmluau": "^0.1.1"
+    "npmluau": "^0.1.2"
   },
-  "packageManager": "yarn@4.0.2"
+  "packageManager": "yarn@4.6.0"
 }
