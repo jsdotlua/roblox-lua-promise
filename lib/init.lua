@@ -1054,13 +1054,7 @@ function Promise.delay(seconds)
 		task.delay(seconds, function()
 			resolve(Promise._getTime() - startTime)
 		end)
-			end)
-			end)
-		end)
-	end
 	end)
-		end)
-	end
 end
 
 --[=[
